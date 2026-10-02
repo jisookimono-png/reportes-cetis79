@@ -1,36 +1,44 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
-import os
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Reportes de Prefectura CETIS 79", layout="centered", page_icon="📋")
 
-# Archivo central donde se guardarán todos los reportes del día
-ARCHIVO_CENTRAL = "reportes_diarios.csv"
+# --- CONEXIÓN A GOOGLE SHEETS ---
+@st.cache_resource
+def conectar_google_sheets():
+    # Los secretos se leerán desde la configuración de Streamlit Cloud
+    scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+    credenciales = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    cliente = gspread.authorize(credenciales)
+    hoja = cliente.open("Reportes_Prefectura_CETIS79").sheet1
+    return hoja
 
+# --- CARGAR BASE DE MAESTROS LOCAL ---
 @st.cache_data
-def cargar_datos():
+def cargar_maestros():
     return pd.read_csv("base_maestros_cetis79.csv")
 
 try:
-    df_horarios = cargar_datos()
-except FileNotFoundError:
-    st.error("No se encontró el archivo base_maestros_cetis79.csv.")
+    hoja_reportes = conectar_google_sheets()
+    df_horarios = cargar_maestros()
+except Exception as e:
+    st.error(f"Error de conexión: Verifica que tu archivo en Drive se llame exactamente 'Reportes_Prefectura_CETIS79' y esté compartido con el correo de servicio. Detalle: {e}")
     st.stop()
 
 st.title("📋 Reportes de Incidencias - Prefectura")
 
 dias_semana = {0: "LUNES", 1: "MARTES", 2: "MIERCOLES", 3: "JUEVES", 4: "VIERNES", 5: "SABADO", 6: "DOMINGO"}
 
-# --- 0. IDENTIFICACIÓN DEL PREFECTO ---
+# --- DATOS DEL PREFECTO ---
 st.markdown("### Datos del Prefecto")
 nombre_prefecto = st.text_input("Nombre del prefecto en turno:", placeholder="Ej. Juan Pérez")
-
 st.divider()
 
-# --- 1. CAPTURAR INCIDENCIA ---
-st.header("1. Buscar y Capturar Incidencia")
+# --- CAPTURA DE INCIDENCIA ---
+st.header("Buscar y Capturar Incidencia")
 
 fecha_seleccionada = st.date_input("Fecha de la incidencia")
 dia_texto = dias_semana[fecha_seleccionada.weekday()]
@@ -83,59 +91,29 @@ else:
             if tipo_incidencia == "RETARDO":
                 hora_retardo = st.text_input("Hora exacta del retardo (ej. 18:10)")
                 
-        if st.button("➕ Agregar al Reporte Global", type="primary"):
+        if st.button("🚀 Enviar a Google Drive", type="primary"):
             if not nombre_prefecto:
-                st.error("⚠️️ Debes ingresar tu nombre de prefecto en la parte superior antes de registrar.")
+                st.error("⚠ Ingresa tu nombre en la parte superior.")
             else:
                 grado = datos_clase['GRADO_GRUPO'].split('°')[0] if '°' in datos_clase['GRADO_GRUPO'] else ""
                 grupo = datos_clase['GRADO_GRUPO'].split('°')[1].strip() if '°' in datos_clase['GRADO_GRUPO'] else datos_clase['GRADO_GRUPO']
                 
-                nuevo_reporte = {
-                    "FECHA": fecha_seleccionada.strftime("%d/%m/%Y"),
-                    "DIA": dia_texto,
-                    "DOCENTE": datos_clase['DOCENTE'],
-                    "MODULO": datos_clase['MODULO'],
-                    "FALTA": "FALTA" if tipo_incidencia == "FALTA" else "",
-                    "RETARDO": hora_retardo if tipo_incidencia == "RETARDO" else "",
-                    "GRADO": grado,
-                    "GRUPO": grupo,
-                    "PREFECTO_QUE_REPORTA": nombre_prefecto
-                }
+                falta = "FALTA" if tipo_incidencia == "FALTA" else ""
+                retardo = hora_retardo if tipo_incidencia == "RETARDO" else ""
                 
-                # Guardar en el archivo centralizado
-                df_nuevo = pd.DataFrame([nuevo_reporte])
-                if os.path.exists(ARCHIVO_CENTRAL):
-                    df_existente = pd.read_csv(ARCHIVO_CENTRAL)
-                    df_final = pd.concat([df_existente, df_nuevo], ignore_index=True)
-                else:
-                    df_final = df_nuevo
-                    
-                df_final.to_csv(ARCHIVO_CENTRAL, index=False)
-                st.success(f"Registrado correctamente en la base central por {nombre_prefecto}.")
-
-st.divider()
-
-# --- 2. VISTA PREVIA Y EXPORTACIÓN GLOBAL ---
-st.header("2. Reporte Final del Día")
-
-if os.path.exists(ARCHIVO_CENTRAL):
-    df_reporte = pd.read_csv(ARCHIVO_CENTRAL)
-    
-    st.dataframe(df_reporte, use_container_width=True)
-    
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df_reporte.to_excel(writer, index=False, sheet_name='Reporte_Diario')
-        
-    st.download_button(
-        label="📥 Descargar Excel con TODOS los reportes",
-        data=buffer.getvalue(),
-        file_name=f"Reporte_Global_Prefectura_{datetime.today().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    
-    if st.button("🗑️ Borrar base de datos (Usar al final del día)"):
-        os.remove(ARCHIVO_CENTRAL)
-        st.rerun()
-else:
-    st.info("Aún no hay incidencias capturadas el día de hoy.")
+                try:
+                    # Inyectar directamente la fila en Google Sheets
+                    hoja_reportes.append_row([
+                        fecha_seleccionada.strftime("%d/%m/%Y"),
+                        dia_texto,
+                        datos_clase['DOCENTE'],
+                        datos_clase['MODULO'],
+                        falta,
+                        retardo,
+                        grado,
+                        grupo,
+                        nombre_prefecto
+                    ])
+                    st.success("✅ ¡Incidencia registrada en la nube exitosamente!")
+                except Exception as e:
+                    st.error(f"Hubo un error al escribir en el Excel de Drive: {e}")
