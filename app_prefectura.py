@@ -4,7 +4,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Reportes de Prefectura CETIS 79", layout="centered", page_icon="📋")
+st.set_page_config(page_title="Reportes de Prefectura CETIS 79 (Vespertino)", layout="centered", page_icon="📋")
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
 @st.cache_resource
