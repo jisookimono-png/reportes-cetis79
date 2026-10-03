@@ -28,7 +28,7 @@ except Exception as e:
     st.error(f"Error de conexión: Verifica que tu archivo en Drive se llame exactamente 'Reportes_Prefectura_CETIS79' y esté compartido con el correo de servicio. Detalle: {e}")
     st.stop()
 
-st.title("📋 Reportes de Incidencias - Prefectura")
+st.title("📋 Reportes de Incidencias - Prefectura - Vespertino")
 
 dias_semana = {0: "LUNES", 1: "MARTES", 2: "MIERCOLES", 3: "JUEVES", 4: "VIERNES", 5: "SABADO", 6: "DOMINGO"}
 
