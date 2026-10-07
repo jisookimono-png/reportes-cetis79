@@ -97,7 +97,10 @@ else:
         with col_inc2:
             hora_retardo = ""
             if tipo_incidencia == "RETARDO":
-                hora_retardo = st.text_input("Hora exacta del retardo (ej. 18:10)")
+                hora_retardo = st.text_input("Hora exacta del retardo (ej. 7:10)")
+                
+        # --- NUEVO CAMPO DE OBSERVACIONES ---
+        observaciones = st.text_area("Observaciones (Opcional):", placeholder="Anota aquí cualquier detalle o justificación...")
                 
         if st.button("🚀 Enviar a Google Drive", type="primary"):
             if not nombre_prefecto:
@@ -110,7 +113,7 @@ else:
                 retardo = hora_retardo if tipo_incidencia == "RETARDO" else ""
                 
                 try:
-                    # Inyectar directamente la fila en Google Sheets
+                    # Inyectar directamente la fila en Google Sheets (Ahora con 10 columnas)
                     hoja_reportes.append_row([
                         fecha_seleccionada.strftime("%d/%m/%Y"),
                         dia_texto,
@@ -120,7 +123,8 @@ else:
                         retardo,
                         grado,
                         grupo,
-                        nombre_prefecto
+                        nombre_prefecto,
+                        observaciones # <-- El nuevo dato que se manda a la columna J
                     ])
                     st.success("✅ ¡Incidencia registrada en la nube exitosamente!")
                 except Exception as e:
