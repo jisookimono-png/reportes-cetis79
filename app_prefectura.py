@@ -13,7 +13,7 @@ def conectar_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     credenciales = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     cliente = gspread.authorize(credenciales)
-    hoja = cliente.open("Reportes_Prefectura_CETIS79").sheet1
+    hoja = cliente.open("Reportes_Prefectura_Vespertino").sheet1
     return hoja
 
 # --- CARGAR BASE DE MAESTROS LOCAL ---
